@@ -1,0 +1,30 @@
+name: kessai
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: kessai-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: kessai_wallet
+      MYSQL_USER: kessai
+      MYSQL_PASSWORD: kessai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      # Isolation level is deliberately left at MySQL's default (REPEATABLE READ).
+      # Week 2 changes it to READ COMMITTED and measures what that does to the
+      # concurrent-transfer tests, so it needs to start from the default.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
