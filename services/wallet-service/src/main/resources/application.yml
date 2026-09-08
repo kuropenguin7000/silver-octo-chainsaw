@@ -9,15 +9,14 @@ spring:
 
   jpa:
     hibernate:
-      # Flyway owns the schema. `validate` makes Hibernate check that the entities match what the
-      # migrations built, and fail loudly at startup if they have drifted. Never `update`.
       ddl-auto: validate
-    # Default `true` holds a Hibernate session open through view rendering, which hides
-    # lazy-loading mistakes in development and turns them into N+1 queries in production.
     open-in-view: false
     properties:
       hibernate:
         format_sql: true
+        jdbc:
+          # DATETIME(6) has no timezone; without this Hibernate uses the JVM default (+07:00 here).
+          time_zone: UTC
 
   flyway:
     enabled: true
