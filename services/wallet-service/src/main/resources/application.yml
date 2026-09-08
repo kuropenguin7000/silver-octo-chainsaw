@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: wallet-service
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/kessai_wallet?useSSL=false&allowPublicKeyRetrieval=true
+    username: kessai
+    password: kessai
+
+  jpa:
+    hibernate:
+      # Flyway owns the schema. `validate` makes Hibernate check that the entities match what the
+      # migrations built, and fail loudly at startup if they have drifted. Never `update`.
+      ddl-auto: validate
+    # Default `true` holds a Hibernate session open through view rendering, which hides
+    # lazy-loading mistakes in development and turns them into N+1 queries in production.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.flywaydb: INFO
