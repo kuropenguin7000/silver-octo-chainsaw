@@ -16,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
@@ -50,6 +51,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setProperty("errors", fieldErrors);
 
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(problem);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ProblemDetail> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+
+        Class<?> required = ex.getRequiredType();
+        String detail = "Parameter '" + ex.getName() + "' must be a valid "
+                + (required == null ? "value" : required.getSimpleName());
+
+        // Deliberately does not echo ex.getValue() -- never reflect unvalidated input back.
+        ProblemDetail problem =
+                problemDetail(ErrorCode.MALFORMED_REQUEST, detail, request.getRequestURI());
+        return ResponseEntity.status(ErrorCode.MALFORMED_REQUEST.status()).body(problem);
     }
 
     @ExceptionHandler(Exception.class)

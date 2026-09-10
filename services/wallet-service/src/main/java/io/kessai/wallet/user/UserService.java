@@ -6,6 +6,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Service
 public class UserService {
 
@@ -34,5 +36,12 @@ public class UserService {
     private DomainException emailTaken(String email) {
         return new DomainException(
                 ErrorCode.USER_EMAIL_TAKEN, "Email " + email + " is already registered");
+    }
+
+    @Transactional(readOnly = true)
+    public User getById(UUID id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new DomainException(
+                        ErrorCode.USER_NOT_FOUND, "No user with id " + id));
     }
 }
