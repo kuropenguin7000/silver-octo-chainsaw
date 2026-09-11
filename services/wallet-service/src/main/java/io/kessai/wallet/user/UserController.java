@@ -2,6 +2,8 @@ package io.kessai.wallet.user;
 
 import io.kessai.wallet.user.dto.CreateUserRequest;
 import io.kessai.wallet.user.dto.UserResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
@@ -24,6 +26,9 @@ public class UserController {
         this.userService = userService;
     }
 
+    @ApiResponse(responseCode = "201", description = "Created")
+    @ApiResponse(responseCode = "400", description = "VALIDATION_FAILED", content = @Content)
+    @ApiResponse(responseCode = "409", description = "USER_EMAIL_TAKEN", content = @Content)
     @PostMapping
     ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
         User user = userService.register(request.displayName(), request.email());
@@ -34,6 +39,9 @@ public class UserController {
         return ResponseEntity.created(location).body(UserResponse.from(user));
     }
 
+    @ApiResponse(responseCode = "200", description = "Found")
+    @ApiResponse(responseCode = "400", description = "MALFORMED_REQUEST", content = @Content)
+    @ApiResponse(responseCode = "404", description = "USER_NOT_FOUND", content = @Content)
     @GetMapping("/{userId}")
     ResponseEntity<UserResponse> get(@PathVariable UUID userId) {
         return ResponseEntity.ok(UserResponse.from(userService.getById(userId)));

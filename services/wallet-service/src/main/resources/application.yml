@@ -29,8 +29,14 @@ management:
         include: health,info,metrics
 
 springdoc:
+  # Both must be false in production: a live schema plus a request console is free reconnaissance.
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
 
 logging:
   level:

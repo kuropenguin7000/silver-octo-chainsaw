@@ -1,9 +1,12 @@
 [versions]
 springBoot = "4.1.1"
 java = "25"
+# 2.x is Spring Boot 3 only; Boot 4 needs 3.x
+springdoc = "3.1.0"
 
 [libraries]
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
+springdoc-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
