@@ -3,21 +3,25 @@ package io.kessai.wallet.shared.error;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import tools.jackson.databind.exc.InvalidFormatException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -53,6 +57,42 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(problem);
     }
 
+    /**
+     * Overridden rather than added as another {@code @ExceptionHandler}: the superclass already
+     * maps this type, and two handlers for one exception fail the context at startup.
+     *
+     * <p>A rejected enum (an unsupported currency) is reported in the same {@code errors} shape as
+     * Bean Validation failures, so clients have one thing to parse rather than two.
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+
+        if (ex.getCause() instanceof InvalidFormatException cause
+                && cause.getTargetType() != null
+                && cause.getTargetType().isEnum()) {
+
+            String allowed = Arrays.stream(cause.getTargetType().getEnumConstants())
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(", "));
+
+            ProblemDetail problem = problemDetail(
+                    ErrorCode.VALIDATION_FAILED, "One or more fields are invalid", path(request));
+            problem.setProperty("errors", List.of(Map.of(
+                    "field", fieldName(cause),
+                    "message", "must be one of [" + allowed + "]")));
+
+            return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(problem);
+        }
+
+        ProblemDetail problem = problemDetail(
+                ErrorCode.MALFORMED_REQUEST, "Request body could not be parsed", path(request));
+        return ResponseEntity.status(ErrorCode.MALFORMED_REQUEST.status()).body(problem);
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ResponseEntity<ProblemDetail> handleTypeMismatch(
             MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
@@ -85,6 +125,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setProperty("code", errorCode.name());
         problem.setProperty("timestamp", Instant.now().toString());
         return problem;
+    }
+
+    private String fieldName(InvalidFormatException cause) {
+        return cause.getPath().isEmpty()
+                ? "body"
+                : cause.getPath().getLast().getPropertyName();
     }
 
     private String path(WebRequest request) {
