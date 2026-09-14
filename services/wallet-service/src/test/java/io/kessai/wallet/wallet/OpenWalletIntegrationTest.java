@@ -32,14 +32,7 @@ class OpenWalletIntegrationTest extends AbstractIntegrationTest {
     private UUID userId;
 
     @BeforeEach
-    void resetAndCreateUser() throws Exception {
-        // Foreign keys dictate the order: account -> wallet -> app_user.
-        accountRepository.deleteAll(accountRepository.findAll().stream()
-                .filter(a -> a.getWalletId() != null)
-                .toList());
-        walletRepository.deleteAll();
-        userRepository.deleteAll();
-
+    void createUser() throws Exception {
         String body = mockMvc.perform(post("/api/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

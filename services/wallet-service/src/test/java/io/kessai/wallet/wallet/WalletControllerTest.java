@@ -3,6 +3,7 @@ package io.kessai.wallet.wallet;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -122,6 +123,42 @@ class WalletControllerTest {
             mockMvc.perform(post("/api/v1/users/{userId}/wallets", USER_ID)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{ not json"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/wallets/{walletId}")
+    class GetById {
+
+        @Test
+        void returns_200_with_the_balance() throws Exception {
+            Wallet wallet = Wallet.open(USER_ID, Currency.JPY);
+            given(walletService.getById(wallet.getId()))
+                    .willReturn(new WalletWithBalance(wallet, Money.yen(10_000)));
+
+            mockMvc.perform(get("/api/v1/wallets/{walletId}", wallet.getId()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(wallet.getId().toString()))
+                    .andExpect(jsonPath("$.balance.minorUnits").value(10_000))
+                    .andExpect(jsonPath("$.balance.currency").value("JPY"));
+        }
+
+        @Test
+        void unknown_wallet_returns_404() throws Exception {
+            UUID missing = UUID.randomUUID();
+            willThrow(new DomainException(ErrorCode.WALLET_NOT_FOUND, "No wallet with id " + missing))
+                    .given(walletService).getById(missing);
+
+            mockMvc.perform(get("/api/v1/wallets/{walletId}", missing))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("WALLET_NOT_FOUND"));
+        }
+
+        @Test
+        void non_uuid_id_returns_400() throws Exception {
+            mockMvc.perform(get("/api/v1/wallets/{walletId}", "abc"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
         }

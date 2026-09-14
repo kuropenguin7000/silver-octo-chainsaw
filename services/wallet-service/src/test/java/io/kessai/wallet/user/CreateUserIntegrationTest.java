@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.kessai.wallet.support.AbstractIntegrationTest;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,12 +16,6 @@ class CreateUserIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
-
-    @BeforeEach
-    void clearUsers() {
-        // Not @Transactional rollback: a test that never commits cannot hit a unique constraint.
-        userRepository.deleteAll();
-    }
 
     @Test
     @DisplayName("registers a user and persists it")

@@ -8,21 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.kessai.wallet.support.AbstractIntegrationTest;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
 class GetUserIntegrationTest extends AbstractIntegrationTest {
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @BeforeEach
-    void clearUsers() {
-        userRepository.deleteAll();
-    }
 
     @Test
     @DisplayName("the Location returned by POST is fetchable")

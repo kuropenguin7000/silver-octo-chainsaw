@@ -56,6 +56,22 @@ public class WalletService {
         return new WalletWithBalance(wallet, balanceAccount.balance());
     }
 
+    @Transactional(readOnly = true)
+    public WalletWithBalance getById(UUID walletId) {
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new DomainException(
+                        ErrorCode.WALLET_NOT_FOUND, "No wallet with id " + walletId));
+
+        // open() guarantees every wallet has this account. Its absence is corrupted state, a 500,
+        // not a missing resource -- a 404 here would hide a data-integrity bug.
+        Account balanceAccount = accountRepository
+                .findByWalletIdAndAccountType(walletId, AccountType.USER_BALANCE)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Wallet " + walletId + " has no USER_BALANCE account"));
+
+        return new WalletWithBalance(wallet, balanceAccount.balance());
+    }
+
     private DomainException alreadyExists(UUID userId, Currency currency) {
         return new DomainException(
                 ErrorCode.WALLET_ALREADY_EXISTS,

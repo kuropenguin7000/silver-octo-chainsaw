@@ -11,6 +11,7 @@ public enum ErrorCode {
     MALFORMED_REQUEST(HttpStatus.BAD_REQUEST, "Malformed request"),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     USER_EMAIL_TAKEN(HttpStatus.CONFLICT, "Email already registered"),
+    WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "Wallet not found"),
     WALLET_ALREADY_EXISTS(HttpStatus.CONFLICT, "Wallet already exists"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error");
 
