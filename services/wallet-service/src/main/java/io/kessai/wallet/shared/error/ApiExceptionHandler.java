@@ -128,9 +128,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private String fieldName(InvalidFormatException cause) {
-        return cause.getPath().isEmpty()
-                ? "body"
-                : cause.getPath().getLast().getPropertyName();
+        String path = cause.getPath().stream()
+                .map(reference -> reference.getPropertyName())
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining("."));
+        return path.isEmpty() ? "body" : path;
     }
 
     private String path(WebRequest request) {

@@ -93,6 +93,11 @@ public class Account {
         return Money.of(balanceMinor, currency);
     }
 
+    /** Package-private: only the ledger may move a balance, and only alongside a journal entry. */
+    void apply(Money amount) {
+        balanceMinor = balance().plus(amount).minorUnits();
+    }
+
     public UUID getId() {
         return id;
     }

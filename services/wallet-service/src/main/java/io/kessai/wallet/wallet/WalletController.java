@@ -1,12 +1,16 @@
 package io.kessai.wallet.wallet;
 
+import io.kessai.wallet.ledger.LedgerPosting;
 import io.kessai.wallet.wallet.dto.CreateWalletRequest;
+import io.kessai.wallet.wallet.dto.TopUpRequest;
+import io.kessai.wallet.wallet.dto.TopUpResponse;
 import io.kessai.wallet.wallet.dto.WalletResponse;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,5 +49,20 @@ public class WalletController {
     @GetMapping("/wallets/{walletId}")
     ResponseEntity<WalletResponse> get(@PathVariable UUID walletId) {
         return ResponseEntity.ok(WalletResponse.from(walletService.getById(walletId)));
+    }
+
+    @ApiResponse(responseCode = "201", description = "Created")
+    @ApiResponse(responseCode = "400", description = "VALIDATION_FAILED", content = @Content)
+    @ApiResponse(responseCode = "404", description = "WALLET_NOT_FOUND", content = @Content)
+    @ApiResponse(responseCode = "409", description = "WALLET_NOT_ACTIVE", content = @Content)
+    @ApiResponse(responseCode = "422", description = "CURRENCY_MISMATCH", content = @Content)
+    @PostMapping("/wallets/{walletId}/topups")
+    ResponseEntity<TopUpResponse> topUp(@PathVariable UUID walletId,
+                                        @Valid @RequestBody TopUpRequest request) {
+
+        LedgerPosting posting =
+                walletService.topUp(walletId, request.amount().toMoney(), request.reference());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(TopUpResponse.from(walletId, posting));
     }
 }

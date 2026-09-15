@@ -13,6 +13,8 @@ public enum ErrorCode {
     USER_EMAIL_TAKEN(HttpStatus.CONFLICT, "Email already registered"),
     WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "Wallet not found"),
     WALLET_ALREADY_EXISTS(HttpStatus.CONFLICT, "Wallet already exists"),
+    WALLET_NOT_ACTIVE(HttpStatus.CONFLICT, "Wallet is not active"),
+    CURRENCY_MISMATCH(HttpStatus.UNPROCESSABLE_CONTENT, "Currency mismatch"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error");
 
     private static final String TYPE_PREFIX = "https://kessai.local/problems/";

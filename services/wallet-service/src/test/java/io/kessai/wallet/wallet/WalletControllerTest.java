@@ -12,8 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.kessai.common.money.Currency;
 import io.kessai.common.money.Money;
+import io.kessai.wallet.ledger.LedgerPosting;
+import io.kessai.wallet.ledger.TransactionType;
 import io.kessai.wallet.shared.error.DomainException;
 import io.kessai.wallet.shared.error.ErrorCode;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -161,6 +164,91 @@ class WalletControllerTest {
             mockMvc.perform(get("/api/v1/wallets/{walletId}", "abc"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/wallets/{walletId}/topups")
+    class TopUp {
+
+        private final UUID walletId = UUID.fromString("01927f3b-1d55-7a02-8e77-9f0011223344");
+
+        @Test
+        void returns_201_with_balance_after() throws Exception {
+            given(walletService.topUp(any(), any(), any())).willReturn(new LedgerPosting(
+                    UUID.randomUUID(), TransactionType.TOP_UP,
+                    Money.yen(10_000), Money.yen(10_000), Instant.parse("2026-09-15T09:00:00Z")));
+
+            mockMvc.perform(post("/api/v1/wallets/{walletId}/topups", walletId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    { "amount": { "minorUnits": 10000, "currency": "JPY" }, "reference": "ref-1" }
+                                    """))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.walletId").value(walletId.toString()))
+                    .andExpect(jsonPath("$.type").value("TOP_UP"))
+                    .andExpect(jsonPath("$.amount.minorUnits").value(10_000))
+                    .andExpect(jsonPath("$.balanceAfter.minorUnits").value(10_000));
+        }
+
+        @Test
+        void zero_amount_names_the_nested_field() throws Exception {
+            mockMvc.perform(post("/api/v1/wallets/{walletId}/topups", walletId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    { "amount": { "minorUnits": 0, "currency": "JPY" } }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                    .andExpect(jsonPath("$.errors[0].field").value("amount.minorUnits"));
+        }
+
+        @Test
+        void missing_amount_returns_400() throws Exception {
+            mockMvc.perform(post("/api/v1/wallets/{walletId}/topups", walletId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("amount"));
+        }
+
+        @Test
+        void unsupported_nested_currency_names_the_full_path() throws Exception {
+            mockMvc.perform(post("/api/v1/wallets/{walletId}/topups", walletId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    { "amount": { "minorUnits": 100, "currency": "GBP" } }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("amount.currency"));
+        }
+
+        @Test
+        void currency_mismatch_returns_422() throws Exception {
+            willThrow(new DomainException(ErrorCode.CURRENCY_MISMATCH, "Wallet holds JPY"))
+                    .given(walletService).topUp(any(), any(), any());
+
+            mockMvc.perform(post("/api/v1/wallets/{walletId}/topups", walletId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    { "amount": { "minorUnits": 100, "currency": "USD" } }
+                                    """))
+                    .andExpect(status().isUnprocessableContent())
+                    .andExpect(jsonPath("$.code").value("CURRENCY_MISMATCH"));
+        }
+
+        @Test
+        void inactive_wallet_returns_409() throws Exception {
+            willThrow(new DomainException(ErrorCode.WALLET_NOT_ACTIVE, "Wallet is FROZEN"))
+                    .given(walletService).topUp(any(), any(), any());
+
+            mockMvc.perform(post("/api/v1/wallets/{walletId}/topups", walletId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    { "amount": { "minorUnits": 100, "currency": "JPY" } }
+                                    """))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("WALLET_NOT_ACTIVE"));
         }
     }
 }

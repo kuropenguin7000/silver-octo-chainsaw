@@ -1,9 +1,12 @@
 package io.kessai.wallet.wallet;
 
 import io.kessai.common.money.Currency;
+import io.kessai.common.money.Money;
 import io.kessai.wallet.ledger.Account;
 import io.kessai.wallet.ledger.AccountRepository;
 import io.kessai.wallet.ledger.AccountType;
+import io.kessai.wallet.ledger.LedgerPosting;
+import io.kessai.wallet.ledger.LedgerService;
 import io.kessai.wallet.shared.error.DomainException;
 import io.kessai.wallet.shared.error.ErrorCode;
 import io.kessai.wallet.user.UserService;
@@ -18,13 +21,16 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final AccountRepository accountRepository;
     private final UserService userService;
+    private final LedgerService ledgerService;
 
     WalletService(WalletRepository walletRepository,
                   AccountRepository accountRepository,
-                  UserService userService) {
+                  UserService userService,
+                  LedgerService ledgerService) {
         this.walletRepository = walletRepository;
         this.accountRepository = accountRepository;
         this.userService = userService;
+        this.ledgerService = ledgerService;
     }
 
     /**
@@ -58,9 +64,7 @@ public class WalletService {
 
     @Transactional(readOnly = true)
     public WalletWithBalance getById(UUID walletId) {
-        Wallet wallet = walletRepository.findById(walletId)
-                .orElseThrow(() -> new DomainException(
-                        ErrorCode.WALLET_NOT_FOUND, "No wallet with id " + walletId));
+        Wallet wallet = findWallet(walletId);
 
         // open() guarantees every wallet has this account. Its absence is corrupted state, a 500,
         // not a missing resource -- a 404 here would hide a data-integrity bug.
@@ -70,6 +74,30 @@ public class WalletService {
                         "Wallet " + walletId + " has no USER_BALANCE account"));
 
         return new WalletWithBalance(wallet, balanceAccount.balance());
+    }
+
+    @Transactional
+    public LedgerPosting topUp(UUID walletId, Money amount, String reference) {
+        Wallet wallet = findWallet(walletId);
+
+        if (wallet.getStatus() != WalletStatus.ACTIVE) {
+            throw new DomainException(
+                    ErrorCode.WALLET_NOT_ACTIVE, "Wallet " + walletId + " is " + wallet.getStatus());
+        }
+        if (wallet.getCurrency() != amount.currency()) {
+            throw new DomainException(
+                    ErrorCode.CURRENCY_MISMATCH,
+                    "Wallet " + walletId + " holds " + wallet.getCurrency()
+                            + " but the request was for " + amount.currency());
+        }
+
+        return ledgerService.recordTopUp(walletId, amount, reference);
+    }
+
+    private Wallet findWallet(UUID walletId) {
+        return walletRepository.findById(walletId)
+                .orElseThrow(() -> new DomainException(
+                        ErrorCode.WALLET_NOT_FOUND, "No wallet with id " + walletId));
     }
 
     private DomainException alreadyExists(UUID userId, Currency currency) {
