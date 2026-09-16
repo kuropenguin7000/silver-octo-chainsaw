@@ -12,17 +12,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.kessai.common.money.Currency;
 import io.kessai.common.money.Money;
+import io.kessai.wallet.ledger.LedgerEntryView;
 import io.kessai.wallet.ledger.LedgerPosting;
 import io.kessai.wallet.ledger.TransactionType;
 import io.kessai.wallet.shared.error.DomainException;
 import io.kessai.wallet.shared.error.ErrorCode;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -164,6 +168,49 @@ class WalletControllerTest {
             mockMvc.perform(get("/api/v1/wallets/{walletId}", "abc"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/wallets/{walletId}/entries")
+    class Entries {
+
+        private final UUID walletId = UUID.fromString("01927f3b-1d55-7a02-8e77-9f0011223344");
+
+        @Test
+        void returns_the_page_with_balance_and_metadata() throws Exception {
+            LedgerEntryView entry = new LedgerEntryView(
+                    UUID.randomUUID(), UUID.randomUUID(), TransactionType.TOP_UP,
+                    10_000, Currency.JPY, Instant.parse("2026-09-16T09:00:00Z"));
+            given(walletService.entries(any(), any())).willReturn(new WalletStatement(
+                    walletId, Money.yen(10_000),
+                    new PageImpl<>(List.of(entry), PageRequest.of(0, 20), 1)));
+
+            mockMvc.perform(get("/api/v1/wallets/{walletId}/entries", walletId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.walletId").value(walletId.toString()))
+                    .andExpect(jsonPath("$.balance.minorUnits").value(10_000))
+                    .andExpect(jsonPath("$.page").value(0))
+                    .andExpect(jsonPath("$.size").value(20))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.totalPages").value(1))
+                    .andExpect(jsonPath("$.entries[0].type").value("TOP_UP"))
+                    .andExpect(jsonPath("$.entries[0].amount.minorUnits").value(10_000));
+        }
+
+        @Test
+        void rejects_a_page_size_over_the_cap() throws Exception {
+            mockMvc.perform(get("/api/v1/wallets/{walletId}/entries?size=101", walletId))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                    .andExpect(jsonPath("$.errors[0].field").value("size"));
+        }
+
+        @Test
+        void rejects_a_negative_page() throws Exception {
+            mockMvc.perform(get("/api/v1/wallets/{walletId}/entries?page=-1", walletId))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("page"));
         }
     }
 

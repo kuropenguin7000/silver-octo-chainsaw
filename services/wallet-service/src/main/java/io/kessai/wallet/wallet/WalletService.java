@@ -12,6 +12,7 @@ import io.kessai.wallet.shared.error.ErrorCode;
 import io.kessai.wallet.user.UserService;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,16 +65,14 @@ public class WalletService {
 
     @Transactional(readOnly = true)
     public WalletWithBalance getById(UUID walletId) {
-        Wallet wallet = findWallet(walletId);
+        return loadWithBalance(walletId);
+    }
 
-        // open() guarantees every wallet has this account. Its absence is corrupted state, a 500,
-        // not a missing resource -- a 404 here would hide a data-integrity bug.
-        Account balanceAccount = accountRepository
-                .findByWalletIdAndAccountType(walletId, AccountType.USER_BALANCE)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Wallet " + walletId + " has no USER_BALANCE account"));
-
-        return new WalletWithBalance(wallet, balanceAccount.balance());
+    @Transactional(readOnly = true)
+    public WalletStatement entries(UUID walletId, Pageable pageable) {
+        WalletWithBalance wallet = loadWithBalance(walletId);
+        return new WalletStatement(
+                walletId, wallet.balance(), ledgerService.entriesFor(walletId, pageable));
     }
 
     @Transactional
@@ -92,6 +91,20 @@ public class WalletService {
         }
 
         return ledgerService.recordTopUp(walletId, amount, reference);
+    }
+
+    /** A private helper, not a call to getById: self-invocation would bypass the proxy. */
+    private WalletWithBalance loadWithBalance(UUID walletId) {
+        Wallet wallet = findWallet(walletId);
+
+        // open() guarantees every wallet has this account. Its absence is corrupted state, a 500,
+        // not a missing resource -- a 404 here would hide a data-integrity bug.
+        Account balanceAccount = accountRepository
+                .findByWalletIdAndAccountType(walletId, AccountType.USER_BALANCE)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Wallet " + walletId + " has no USER_BALANCE account"));
+
+        return new WalletWithBalance(wallet, balanceAccount.balance());
     }
 
     private Wallet findWallet(UUID walletId) {

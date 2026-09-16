@@ -2,6 +2,8 @@ package io.kessai.wallet.ledger;
 
 import io.kessai.common.money.Money;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,10 +34,7 @@ public class LedgerService {
             throw new IllegalArgumentException("Top-up amount must be positive, was " + amount);
         }
 
-        Account userBalance = accountRepository
-                .findByWalletIdAndAccountType(walletId, AccountType.USER_BALANCE)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Wallet " + walletId + " has no USER_BALANCE account"));
+        Account userBalance = requireUserBalance(walletId);
         Account funding = accountRepository
                 .findBySystemKey("EXTERNAL_FUNDING_" + amount.currency())
                 .orElseThrow(() -> new IllegalStateException(
@@ -51,9 +50,22 @@ public class LedgerService {
                 amount, userBalance.balance(), transaction.getCreatedAt());
     }
 
+    /** The wallet's own entries only. The matching system-account entries are not the user's business. */
+    @Transactional(readOnly = true)
+    public Page<LedgerEntryView> entriesFor(UUID walletId, Pageable pageable) {
+        return journalEntryRepository.findEntries(requireUserBalance(walletId).getId(), pageable);
+    }
+
     /** The only path that changes a balance, so a balance can never move without its entry. */
     private void post(LedgerTransaction transaction, Account account, Money amount) {
         journalEntryRepository.save(JournalEntry.of(transaction.getId(), account.getId(), amount));
         account.apply(amount);
+    }
+
+    private Account requireUserBalance(UUID walletId) {
+        return accountRepository
+                .findByWalletIdAndAccountType(walletId, AccountType.USER_BALANCE)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Wallet " + walletId + " has no USER_BALANCE account"));
     }
 }

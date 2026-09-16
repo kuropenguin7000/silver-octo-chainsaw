@@ -3,13 +3,17 @@ package io.kessai.wallet.wallet;
 import io.kessai.wallet.ledger.LedgerPosting;
 import io.kessai.wallet.wallet.dto.CreateWalletRequest;
 import io.kessai.wallet.wallet.dto.TopUpRequest;
+import io.kessai.wallet.wallet.dto.WalletEntriesResponse;
 import io.kessai.wallet.wallet.dto.TopUpResponse;
 import io.kessai.wallet.wallet.dto.WalletResponse;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.net.URI;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -49,6 +54,20 @@ public class WalletController {
     @GetMapping("/wallets/{walletId}")
     ResponseEntity<WalletResponse> get(@PathVariable UUID walletId) {
         return ResponseEntity.ok(WalletResponse.from(walletService.getById(walletId)));
+    }
+
+    @ApiResponse(responseCode = "200", description = "Found")
+    @ApiResponse(responseCode = "400", description = "VALIDATION_FAILED", content = @Content)
+    @ApiResponse(responseCode = "404", description = "WALLET_NOT_FOUND", content = @Content)
+    @GetMapping("/wallets/{walletId}/entries")
+    ResponseEntity<WalletEntriesResponse> entries(
+            @PathVariable UUID walletId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            // Capped: an unbounded page size lets one request read the whole ledger.
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+
+        return ResponseEntity.ok(
+                WalletEntriesResponse.from(walletService.entries(walletId, PageRequest.of(page, size))));
     }
 
     @ApiResponse(responseCode = "201", description = "Created")

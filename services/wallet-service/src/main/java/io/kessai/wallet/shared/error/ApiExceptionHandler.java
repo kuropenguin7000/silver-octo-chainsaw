@@ -19,6 +19,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import tools.jackson.databind.exc.InvalidFormatException;
@@ -91,6 +92,29 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = problemDetail(
                 ErrorCode.MALFORMED_REQUEST, "Request body could not be parsed", path(request));
         return ResponseEntity.status(ErrorCode.MALFORMED_REQUEST.status()).body(problem);
+    }
+
+    /** Constraints on {@code @RequestParam} arguments, e.g. a page size above the cap. */
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(
+            HandlerMethodValidationException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+
+        List<Map<String, String>> errors = ex.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(error -> Map.of(
+                                "field", Objects.toString(
+                                        result.getMethodParameter().getParameterName(), "parameter"),
+                                "message", Objects.toString(error.getDefaultMessage(), "is invalid"))))
+                .toList();
+
+        ProblemDetail problem = problemDetail(
+                ErrorCode.VALIDATION_FAILED, "One or more parameters are invalid", path(request));
+        problem.setProperty("errors", errors);
+
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(problem);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
